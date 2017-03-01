@@ -29,8 +29,8 @@ import com.thinkbiganalytics.metadata.api.event.MetadataChange;
 import com.thinkbiganalytics.metadata.api.event.MetadataEventService;
 import com.thinkbiganalytics.metadata.api.event.template.TemplateChange;
 import com.thinkbiganalytics.metadata.api.event.template.TemplateChangeEvent;
-import com.thinkbiganalytics.metadata.api.feedmgr.template.FeedManagerTemplate;
-import com.thinkbiganalytics.metadata.api.feedmgr.template.FeedManagerTemplateProvider;
+import com.thinkbiganalytics.metadata.api.template.FeedManagerTemplate;
+import com.thinkbiganalytics.metadata.api.template.FeedManagerTemplateProvider;
 import com.thinkbiganalytics.security.AccessController;
 
 import org.apache.commons.lang3.StringUtils;

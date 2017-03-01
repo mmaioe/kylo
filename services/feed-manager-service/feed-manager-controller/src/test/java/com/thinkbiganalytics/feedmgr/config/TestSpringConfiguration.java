@@ -40,7 +40,6 @@ import com.thinkbiganalytics.metadata.api.MetadataRollbackAction;
 import com.thinkbiganalytics.metadata.api.MetadataRollbackCommand;
 import com.thinkbiganalytics.metadata.api.datasource.DatasourceProvider;
 import com.thinkbiganalytics.metadata.api.feed.FeedProvider;
-import com.thinkbiganalytics.metadata.api.feedmgr.feed.FeedManagerFeedProvider;
 import com.thinkbiganalytics.metadata.api.sla.FeedServiceLevelAgreementProvider;
 import com.thinkbiganalytics.metadata.core.dataset.InMemoryDatasourceProvider;
 import com.thinkbiganalytics.metadata.core.feed.InMemoryFeedProvider;
@@ -113,11 +112,6 @@ public class TestSpringConfiguration {
     @Bean
     public ModeShapeEngine modeShapeEngine() {
         return Mockito.mock(ModeShapeEngine.class);
-    }
-
-    @Bean
-    public FeedManagerFeedProvider feedManagerFeedProvider() {
-        return Mockito.mock(FeedManagerFeedProvider.class);
     }
 
     @Bean
