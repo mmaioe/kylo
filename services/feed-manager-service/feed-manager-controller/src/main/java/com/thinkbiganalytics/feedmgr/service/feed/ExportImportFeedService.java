@@ -27,12 +27,13 @@ import com.thinkbiganalytics.feedmgr.rest.model.ImportFeedOptions;
 import com.thinkbiganalytics.feedmgr.rest.model.ImportOptions;
 import com.thinkbiganalytics.feedmgr.rest.model.NifiFeed;
 import com.thinkbiganalytics.feedmgr.rest.model.RegisteredTemplate;
-import com.thinkbiganalytics.feedmgr.security.FeedsAccessControl;
+import com.thinkbiganalytics.feedmgr.security.FeedServicesAccessControl;
 import com.thinkbiganalytics.feedmgr.service.ExportImportTemplateService;
 import com.thinkbiganalytics.feedmgr.service.MetadataService;
 import com.thinkbiganalytics.feedmgr.support.ZipFileUtil;
 import com.thinkbiganalytics.json.ObjectMapperSerializer;
 import com.thinkbiganalytics.metadata.api.MetadataAccess;
+import com.thinkbiganalytics.metadata.api.feed.security.FeedAccessControl;
 import com.thinkbiganalytics.security.AccessController;
 import com.thinkbiganalytics.support.FeedNameUtil;
 
@@ -111,7 +112,8 @@ public class ExportImportFeedService {
     }
 
     public ExportFeed exportFeed(String feedId) throws IOException {
-        this.accessController.checkPermission(AccessController.SERVICES, FeedsAccessControl.EXPORT_FEEDS);
+        this.accessController.checkPermission(AccessController.SERVICES, FeedServicesAccessControl.EXPORT_FEEDS);
+        this.metadataService.checkFeedPermission(feedId, FeedAccessControl.EXPORT);
 
         FeedMetadata feed = metadataService.getFeedById(feedId);
         RegisteredTemplate template = feed.getRegisteredTemplate();
@@ -134,8 +136,8 @@ public class ExportImportFeedService {
         return content;
     }
 
-    public ImportFeed importFeed(String fileName, InputStream inputStream, ImportFeedOptions importOptions) throws IOException {
-        this.accessController.checkPermission(AccessController.SERVICES, FeedsAccessControl.IMPORT_FEEDS);
+    public ImportFeed importFeed(String fileName, InputStream inputStream, ImportOptions importOptions) throws IOException {
+        this.accessController.checkPermission(AccessController.SERVICES, FeedServicesAccessControl.IMPORT_FEEDS);
 
         byte[] content = streamToByteArray(inputStream);
 

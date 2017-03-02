@@ -29,7 +29,7 @@ import com.thinkbiganalytics.feedmgr.rest.model.ImportOptions;
 import com.thinkbiganalytics.feedmgr.rest.model.RegisteredTemplate;
 import com.thinkbiganalytics.feedmgr.rest.model.ReusableTemplateConnectionInfo;
 import com.thinkbiganalytics.feedmgr.rest.support.SystemNamingService;
-import com.thinkbiganalytics.feedmgr.security.FeedsAccessControl;
+import com.thinkbiganalytics.feedmgr.security.FeedServicesAccessControl;
 import com.thinkbiganalytics.json.ObjectMapperSerializer;
 import com.thinkbiganalytics.metadata.api.MetadataAccess;
 import com.thinkbiganalytics.nifi.feedmgr.ReusableTemplateCreationCallback;
@@ -113,7 +113,7 @@ public class ExportImportTemplateService {
     }
 
     public ExportTemplate exportTemplate(String templateId) {
-        this.accessController.checkPermission(AccessController.SERVICES, FeedsAccessControl.EXPORT_TEMPLATES);
+        this.accessController.checkPermission(AccessController.SERVICES, FeedServicesAccessControl.EXPORT_TEMPLATES);
 
         RegisteredTemplate template = metadataService.getRegisteredTemplate(templateId);
         if (template != null) {
@@ -197,7 +197,7 @@ public class ExportImportTemplateService {
     }
 
     public ImportTemplate importZip(String fileName, InputStream inputStream, ImportOptions importOptions) throws IOException {
-        this.accessController.checkPermission(AccessController.SERVICES, FeedsAccessControl.IMPORT_TEMPLATES);
+        this.accessController.checkPermission(AccessController.SERVICES, FeedServicesAccessControl.IMPORT_TEMPLATES);
 
         ImportTemplate importTemplate = openZip(fileName, inputStream);
         //verify options before proceeding
@@ -458,7 +458,7 @@ public class ExportImportTemplateService {
 
     public ImportTemplate importTemplate(final String fileName, final InputStream inputStream, ImportOptions importOptions) {
         return metadataAccess.commit(() -> {
-            this.accessController.checkPermission(AccessController.SERVICES, FeedsAccessControl.IMPORT_TEMPLATES);
+            this.accessController.checkPermission(AccessController.SERVICES, FeedServicesAccessControl.IMPORT_TEMPLATES);
 
             ImportTemplate template = null;
             if (!isValidFileImport(fileName)) {

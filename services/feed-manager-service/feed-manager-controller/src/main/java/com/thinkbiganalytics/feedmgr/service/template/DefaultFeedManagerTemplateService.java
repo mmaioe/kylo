@@ -23,7 +23,7 @@ package com.thinkbiganalytics.feedmgr.service.template;
 import com.google.common.collect.Sets;
 import com.thinkbiganalytics.feedmgr.nifi.NifiFlowCache;
 import com.thinkbiganalytics.feedmgr.rest.model.RegisteredTemplate;
-import com.thinkbiganalytics.feedmgr.security.FeedsAccessControl;
+import com.thinkbiganalytics.feedmgr.security.FeedServicesAccessControl;
 import com.thinkbiganalytics.metadata.api.MetadataAccess;
 import com.thinkbiganalytics.metadata.api.event.MetadataChange;
 import com.thinkbiganalytics.metadata.api.event.MetadataEventService;
@@ -82,7 +82,7 @@ public class DefaultFeedManagerTemplateService extends AbstractFeedManagerTempla
     protected RegisteredTemplate saveRegisteredTemplate(final RegisteredTemplate registeredTemplate) {
         List<String> templateOrder = registeredTemplate.getTemplateOrder();
         RegisteredTemplate savedTemplate = metadataAccess.commit(() -> {
-            this.accessController.checkPermission(AccessController.SERVICES, FeedsAccessControl.EDIT_TEMPLATES);
+            this.accessController.checkPermission(AccessController.SERVICES, FeedServicesAccessControl.EDIT_TEMPLATES);
 
             //ensure that the incoming template name doesnt already exist.
             //if so remove and replace with this one
@@ -131,7 +131,7 @@ public class DefaultFeedManagerTemplateService extends AbstractFeedManagerTempla
      */
     public void orderTemplates(List<String> orderedTemplateIds, Set<String> exclude) {
         metadataAccess.commit(() -> {
-            this.accessController.checkPermission(AccessController.SERVICES, FeedsAccessControl.EDIT_TEMPLATES);
+            this.accessController.checkPermission(AccessController.SERVICES, FeedServicesAccessControl.EDIT_TEMPLATES);
 
             if (orderedTemplateIds != null && !orderedTemplateIds.isEmpty()) {
                 IntStream.range(0, orderedTemplateIds.size()).forEach(i -> {
@@ -229,7 +229,7 @@ public class DefaultFeedManagerTemplateService extends AbstractFeedManagerTempla
     @Override
     public RegisteredTemplate getRegisteredTemplate(final String templateId) {
         return metadataAccess.read(() -> {
-            this.accessController.checkPermission(AccessController.SERVICES, FeedsAccessControl.ACCESS_TEMPLATES);
+            this.accessController.checkPermission(AccessController.SERVICES, FeedServicesAccessControl.ACCESS_TEMPLATES);
 
             RegisteredTemplate registeredTemplate = null;
             FeedManagerTemplate.ID domainId = templateProvider.resolveId(templateId);
@@ -250,7 +250,7 @@ public class DefaultFeedManagerTemplateService extends AbstractFeedManagerTempla
 
     public boolean deleteRegisteredTemplate(final String templateId) {
         return metadataAccess.commit(() -> {
-            this.accessController.checkPermission(AccessController.SERVICES, FeedsAccessControl.EDIT_TEMPLATES);
+            this.accessController.checkPermission(AccessController.SERVICES, FeedServicesAccessControl.EDIT_TEMPLATES);
 
             FeedManagerTemplate.ID domainId = templateProvider.resolveId(templateId);
             return templateProvider.deleteTemplate(domainId);
@@ -261,7 +261,7 @@ public class DefaultFeedManagerTemplateService extends AbstractFeedManagerTempla
     @Override
     public RegisteredTemplate getRegisteredTemplateByName(final String templateName) {
         return metadataAccess.read(() -> {
-            this.accessController.checkPermission(AccessController.SERVICES, FeedsAccessControl.ACCESS_TEMPLATES);
+            this.accessController.checkPermission(AccessController.SERVICES, FeedServicesAccessControl.ACCESS_TEMPLATES);
 
             RegisteredTemplate registeredTemplate = null;
             FeedManagerTemplate template = templateProvider.findByName(templateName);
@@ -277,7 +277,7 @@ public class DefaultFeedManagerTemplateService extends AbstractFeedManagerTempla
     @Override
     public RegisteredTemplate getRegisteredTemplateForNifiProperties(final String nifiTemplateId, final String nifiTemplateName) {
         return metadataAccess.read(() -> {
-            this.accessController.checkPermission(AccessController.SERVICES, FeedsAccessControl.ACCESS_TEMPLATES);
+            this.accessController.checkPermission(AccessController.SERVICES, FeedServicesAccessControl.ACCESS_TEMPLATES);
 
             RegisteredTemplate registeredTemplate = null;
             FeedManagerTemplate template = templateProvider.findByNifiTemplateId(nifiTemplateId);
@@ -304,7 +304,7 @@ public class DefaultFeedManagerTemplateService extends AbstractFeedManagerTempla
     @Override
     public List<RegisteredTemplate> getRegisteredTemplates() {
         return metadataAccess.read(() -> {
-            this.accessController.checkPermission(AccessController.SERVICES, FeedsAccessControl.ACCESS_TEMPLATES);
+            this.accessController.checkPermission(AccessController.SERVICES, FeedServicesAccessControl.ACCESS_TEMPLATES);
 
             List<RegisteredTemplate> registeredTemplates = null;
             List<FeedManagerTemplate> templates = templateProvider.findAll();
@@ -324,7 +324,7 @@ public class DefaultFeedManagerTemplateService extends AbstractFeedManagerTempla
     @Override
     public RegisteredTemplate enableTemplate(String templateId) {
         return metadataAccess.commit(() -> {
-            this.accessController.checkPermission(AccessController.SERVICES, FeedsAccessControl.ADMIN_TEMPLATES);
+            this.accessController.checkPermission(AccessController.SERVICES, FeedServicesAccessControl.ADMIN_TEMPLATES);
             FeedManagerTemplate.ID domainId = templateProvider.resolveId(templateId);
             if (domainId != null) {
                 FeedManagerTemplate template = templateProvider.enable(domainId);
@@ -339,7 +339,7 @@ public class DefaultFeedManagerTemplateService extends AbstractFeedManagerTempla
     @Override
     public RegisteredTemplate disableTemplate(String templateId) {
         return metadataAccess.commit(() -> {
-            this.accessController.checkPermission(AccessController.SERVICES, FeedsAccessControl.ADMIN_TEMPLATES);
+            this.accessController.checkPermission(AccessController.SERVICES, FeedServicesAccessControl.ADMIN_TEMPLATES);
             FeedManagerTemplate.ID domainId = templateProvider.resolveId(templateId);
             if (domainId != null) {
                 FeedManagerTemplate template = templateProvider.disable(domainId);
