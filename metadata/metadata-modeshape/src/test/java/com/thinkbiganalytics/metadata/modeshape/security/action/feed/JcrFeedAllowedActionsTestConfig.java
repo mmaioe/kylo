@@ -1,11 +1,11 @@
 /**
  *
  */
-package com.thinkbiganalytics.feedmgr.config;
+package com.thinkbiganalytics.metadata.modeshape.security.action.feed;
 
 /*-
  * #%L
- * thinkbig-feed-manager-controller
+ * thinkbig-metadata-modeshape
  * %%
  * Copyright (C) 2017 ThinkBig Analytics
  * %%
@@ -23,52 +23,38 @@ package com.thinkbiganalytics.feedmgr.config;
  * #L%
  */
 
-import com.thinkbiganalytics.feedmgr.security.FeedServicesAccessControl;
 import com.thinkbiganalytics.metadata.api.MetadataAccess;
 import com.thinkbiganalytics.metadata.api.PostMetadataConfigAction;
+import com.thinkbiganalytics.metadata.api.category.CategoryProvider;
+import com.thinkbiganalytics.metadata.api.feed.FeedProvider;
 import com.thinkbiganalytics.metadata.api.feed.security.FeedAccessControl;
+import com.thinkbiganalytics.metadata.modeshape.JcrMetadataAccess;
+import com.thinkbiganalytics.metadata.modeshape.category.JcrCategoryProvider;
+import com.thinkbiganalytics.metadata.modeshape.feed.JcrFeedProvider;
 import com.thinkbiganalytics.security.action.AllowedActions;
 import com.thinkbiganalytics.security.action.config.ActionsModuleBuilder;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 
 import javax.inject.Inject;
 
 /**
- * Configures the allowable actions for feed management.
+ *
  */
 @Configuration
-public class FeedManagerSecurityConfiguration {
-
-    @Inject
-    private MetadataAccess metadata;
+public class JcrFeedAllowedActionsTestConfig {
 
     @Inject
     private ActionsModuleBuilder builder;
 
     @Bean
-    public PostMetadataConfigAction feedManagerSecurityConfigAction() {
-        //@formatter:off
+    public PostMetadataConfigAction configAuthorization() {
+        return () -> metadataAccess().commit(() -> {
+            //@formatter:off
 
-        return () -> metadata.commit(() -> {
             return builder
-                            .module(AllowedActions.SERVICES)
-                                .action(FeedServicesAccessControl.FEEDS_SUPPORT)
-                                .action(FeedServicesAccessControl.ACCESS_FEEDS)
-                                .action(FeedServicesAccessControl.EDIT_FEEDS)
-                                .action(FeedServicesAccessControl.IMPORT_FEEDS)
-                                .action(FeedServicesAccessControl.EXPORT_FEEDS)
-                                .action(FeedServicesAccessControl.ADMIN_FEEDS)
-                                .action(FeedServicesAccessControl.ACCESS_CATEGORIES)
-                                .action(FeedServicesAccessControl.EDIT_CATEGORIES)
-                                .action(FeedServicesAccessControl.ADMIN_CATEGORIES)
-                                .action(FeedServicesAccessControl.ACCESS_TEMPLATES)
-                                .action(FeedServicesAccessControl.EDIT_TEMPLATES)
-                                .action(FeedServicesAccessControl.IMPORT_TEMPLATES)
-                                .action(FeedServicesAccessControl.EXPORT_TEMPLATES)
-                                .action(FeedServicesAccessControl.ADMIN_TEMPLATES)
-                                .add()
                             .module(AllowedActions.FEED)
                                 .action(FeedAccessControl.ACCESS_FEED)
                                 .action(FeedAccessControl.EDIT_SUMMARY)
@@ -77,13 +63,33 @@ public class FeedManagerSecurityConfiguration {
                                 .action(FeedAccessControl.DELETE)
                                 .action(FeedAccessControl.ENABLE_DISABLE)
                                 .action(FeedAccessControl.EXPORT)
-//                                .action(FeedAccessControl.SCHEDULE_FEED)
+    //                            .action(FeedAccessControl.SCHEDULE_FEED)
                                 .action(FeedAccessControl.ACCESS_OPS)
                                 .action(FeedAccessControl.CHANGE_PERMS)
                                 .add()
                             .build();
-            }, MetadataAccess.SERVICE);
 
-        // @formatter:on
+            //@formatter:on
+        }, MetadataAccess.SERVICE);
     }
+    
+
+    @Bean
+    @Primary
+    public FeedProvider feedProvider() {
+        return new JcrFeedProvider();
+    }
+
+    @Bean
+    @Primary
+    public CategoryProvider categoryProvider() {
+        return new JcrCategoryProvider();
+    }
+
+    @Bean
+    @Primary
+    public JcrMetadataAccess metadataAccess() {
+        return new JcrMetadataAccess();
+    }
+
 }
