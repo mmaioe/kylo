@@ -3,6 +3,13 @@
  */
 package com.thinkbiganalytics.metadata.rest.model.feed;
 
+import java.io.Serializable;
+import java.util.HashSet;
+import java.util.Properties;
+import java.util.Set;
+
+import org.joda.time.DateTime;
+
 /*-
  * #%L
  * thinkbig-metadata-rest-model
@@ -26,13 +33,7 @@ package com.thinkbiganalytics.metadata.rest.model.feed;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
-
-import org.joda.time.DateTime;
-
-import java.io.Serializable;
-import java.util.HashSet;
-import java.util.Properties;
-import java.util.Set;
+import com.thinkbiganalytics.security.rest.model.ActionGroup;
 
 /**
  *
@@ -66,9 +67,18 @@ public class Feed implements Serializable {
      */
     private Set<Feed> usedByFeeds;
     private Set<String> usedByFeedIds;
+    private ActionGroup allowedActions;
 
     public Feed() {
         super();
+    }
+    
+    public ActionGroup getAllowedActions() {
+        return allowedActions;
+    }
+    
+    public void setAllowedActions(ActionGroup allowedActions) {
+        this.allowedActions = allowedActions;
     }
 
     public String getId() {

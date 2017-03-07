@@ -168,6 +168,7 @@ public class Model {
                 feed.setState(Feed.State.valueOf(domain.getState().name()));
                 feed.setCreatedTime(domain.getCreatedTime());
                 feed.setCurrentInitStatus(DOMAIN_TO_INIT_STATUS.apply(domain.getCurrentInitStatus()));
+                
                 if (domain.getCategory() != null) {
                     feed.setCategory(DOMAIN_TO_FEED_CATEGORY.apply(domain.getCategory()));
                 }
