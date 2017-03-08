@@ -56,7 +56,7 @@ import javax.inject.Inject;
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(classes = {ModeShapeEngineConfig.class, JcrTestConfig.class, FeedTestConfig.class})
 @ComponentScan(basePackages = {"com.thinkbiganalytics.metadata.modeshape"})
-public class TestFeedManagerFeed {
+public class FeedManagerFeedTest {
 
     @Inject
     CategoryProvider categoryProvider;
@@ -66,9 +66,6 @@ public class TestFeedManagerFeed {
 
     @Inject
     FeedManagerTemplateProvider feedManagerTemplateProvider;
-
-    @Inject
-    CategoryProvider feedManagerCategoryProvider;
 
     @Inject
     private DatasourceProvider datasourceProvider;
@@ -179,19 +176,19 @@ public class TestFeedManagerFeed {
         Assert.assertFalse(deleteStatus);
 
         //try to delete the feed
-        metadata.commit(new AdminCredentials(), () -> {
+        metadata.commit(() -> {
             Feed feed = feedTestUtil.findFeed(categorySystemName, feedName);
             Assert.assertNotNull(feed);
             if (feed != null) {
                 feedProvider.delete(feed);
             }
-        });
+        }, MetadataAccess.SERVICE);
 
         //ensure it is deleted
-        metadata.read(new AdminCredentials(), () -> {
+        metadata.read(() -> {
             Feed feed = feedTestUtil.findFeed(categorySystemName, feedName);
             Assert.assertNull(feed);
-        });
+        }, MetadataAccess.SERVICE);
 
         //try to delete the template.  This should succeed since the feeds are gone
         deleteStatus = deleteTemplate(templateName);
