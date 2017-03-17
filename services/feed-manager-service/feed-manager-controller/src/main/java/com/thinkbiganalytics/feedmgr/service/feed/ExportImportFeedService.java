@@ -24,7 +24,6 @@ import com.google.common.collect.Sets;
 import com.thinkbiganalytics.feedmgr.rest.model.FeedCategory;
 import com.thinkbiganalytics.feedmgr.rest.model.FeedMetadata;
 import com.thinkbiganalytics.feedmgr.rest.model.ImportFeedOptions;
-import com.thinkbiganalytics.feedmgr.rest.model.ImportOptions;
 import com.thinkbiganalytics.feedmgr.rest.model.NifiFeed;
 import com.thinkbiganalytics.feedmgr.rest.model.RegisteredTemplate;
 import com.thinkbiganalytics.feedmgr.security.FeedServicesAccessControl;
@@ -136,7 +135,7 @@ public class ExportImportFeedService {
         return content;
     }
 
-    public ImportFeed importFeed(String fileName, InputStream inputStream, ImportOptions importOptions) throws IOException {
+    public ImportFeed importFeed(String fileName, InputStream inputStream, ImportFeedOptions importOptions) throws IOException {
         this.accessController.checkPermission(AccessController.SERVICES, FeedServicesAccessControl.IMPORT_FEEDS);
 
         byte[] content = streamToByteArray(inputStream);
