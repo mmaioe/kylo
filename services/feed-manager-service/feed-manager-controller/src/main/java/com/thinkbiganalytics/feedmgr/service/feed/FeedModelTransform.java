@@ -43,6 +43,8 @@ import com.thinkbiganalytics.metadata.api.security.HadoopSecurityGroupProvider;
 import com.thinkbiganalytics.metadata.api.template.FeedManagerTemplate;
 import com.thinkbiganalytics.metadata.api.template.FeedManagerTemplateProvider;
 import com.thinkbiganalytics.metadata.modeshape.security.JcrHadoopSecurityGroup;
+import com.thinkbiganalytics.security.rest.controller.ActionsModelTransform;
+import com.thinkbiganalytics.security.rest.model.ActionGroup;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -71,6 +73,9 @@ public class FeedModelTransform {
 
     @Inject
     private FeedProvider feedProvider;
+    
+    @Inject
+    private ActionsModelTransform actionsTransform;
 
     @Inject
     private TemplateModelTransform templateModelTransform;
@@ -281,6 +286,9 @@ public class FeedModelTransform {
                 .collect(Collectors.toList());
             feed.setUsedByFeeds(usedByFeeds);
         }
+
+        ActionGroup allowed = actionsTransform.allowedActionsToActionSet(null).apply(domain.getAllowedActions());
+        feed.setAllowedActions(allowed);
 
         return feed;
     }

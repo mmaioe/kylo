@@ -30,6 +30,7 @@ import com.thinkbiganalytics.feedmgr.rest.model.schema.FeedProcessingOptions;
 import com.thinkbiganalytics.feedmgr.rest.model.schema.TableSetup;
 import com.thinkbiganalytics.metadata.MetadataField;
 import com.thinkbiganalytics.nifi.rest.model.NifiProperty;
+import com.thinkbiganalytics.security.rest.model.ActionGroup;
 import com.thinkbiganalytics.support.FeedNameUtil;
 
 import org.apache.commons.lang3.StringUtils;
@@ -110,8 +111,19 @@ public class FeedMetadata implements UIFeed {
      * List of feed IDs dependent on this feed
      */
     private List<FeedSummary> usedByFeeds;
+    
+    private ActionGroup allowedActions;
+
 
     public FeedMetadata() {
+    }
+
+    public ActionGroup getAllowedActions() {
+        return allowedActions;
+    }
+    
+    public void setAllowedActions(ActionGroup allowedActions) {
+        this.allowedActions = allowedActions;
     }
 
     public String getTemplateId() {

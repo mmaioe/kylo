@@ -1,5 +1,14 @@
 package com.thinkbiganalytics.feedmgr.config;
 
+import javax.inject.Inject;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.PropertySource;
+import org.springframework.core.env.Environment;
+import org.springframework.util.Assert;
+
 /*-
  * #%L
  * thinkbig-feed-manager-controller
@@ -41,21 +50,14 @@ import com.thinkbiganalytics.feedmgr.service.feed.FeedManagerFeedService;
 import com.thinkbiganalytics.feedmgr.service.feed.FeedManagerPreconditionService;
 import com.thinkbiganalytics.feedmgr.service.feed.FeedModelTransform;
 import com.thinkbiganalytics.feedmgr.service.feed.datasource.DerivedDatasourceFactory;
+import com.thinkbiganalytics.feedmgr.service.security.DefaultSecurityService;
+import com.thinkbiganalytics.feedmgr.service.security.SecurityService;
 import com.thinkbiganalytics.feedmgr.service.template.DefaultFeedManagerTemplateService;
 import com.thinkbiganalytics.feedmgr.service.template.FeedManagerTemplateService;
 import com.thinkbiganalytics.feedmgr.service.template.TemplateModelTransform;
 import com.thinkbiganalytics.feedmgr.sla.ServiceLevelAgreementService;
 import com.thinkbiganalytics.jobrepo.service.JobService;
 import com.thinkbiganalytics.metadata.core.feed.FeedPreconditionService;
-
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.ComponentScan;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.PropertySource;
-import org.springframework.core.env.Environment;
-import org.springframework.util.Assert;
-
-import javax.inject.Inject;
 
 /**
  * Spring Bean configuration for feed manager
@@ -125,6 +127,11 @@ public class FeedManagerConfiguration {
         return new FeedManagerMetadataService();
     }
 
+    @Bean
+    public SecurityService securityService() {
+        return new DefaultSecurityService();
+    }
+    
     @Bean
     public ExportImportTemplateService exportImportTemplateService() {
         return new ExportImportTemplateService();
