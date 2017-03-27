@@ -35,7 +35,7 @@ import com.thinkbiganalytics.feedmgr.rest.model.NifiFeed;
 import com.thinkbiganalytics.feedmgr.rest.model.RegisteredTemplate;
 import com.thinkbiganalytics.feedmgr.rest.model.UploadProgress;
 import com.thinkbiganalytics.feedmgr.rest.model.UploadProgressMessage;
-import com.thinkbiganalytics.feedmgr.security.FeedsAccessControl;
+import com.thinkbiganalytics.feedmgr.security.FeedServicesAccessControl;
 import com.thinkbiganalytics.feedmgr.service.MetadataService;
 import com.thinkbiganalytics.feedmgr.service.UploadProgressService;
 import com.thinkbiganalytics.feedmgr.service.template.ExportImportTemplateService;
@@ -96,7 +96,7 @@ public class ExportImportFeedService {
      * @return object containing the zip file with data about the feed.
      */
     public ExportFeed exportFeed(String feedId) throws IOException {
-        this.accessController.checkPermission(AccessController.SERVICES, FeedsAccessControl.EXPORT_FEEDS);
+        this.accessController.checkPermission(AccessController.SERVICES, FeedServicesAccessControl.EXPORT_FEEDS);
 
         FeedMetadata feed = metadataService.getFeedById(feedId);
         RegisteredTemplate template = feed.getRegisteredTemplate();
@@ -119,7 +119,7 @@ public class ExportImportFeedService {
      * @return the feed data to import
      */
     public ImportFeed validateFeedForImport(final String fileName, byte[] content, ImportFeedOptions options) throws IOException {
-        this.accessController.checkPermission(AccessController.SERVICES, FeedsAccessControl.IMPORT_FEEDS);
+        this.accessController.checkPermission(AccessController.SERVICES, FeedServicesAccessControl.IMPORT_FEEDS);
         ImportFeed importFeed = null;
         UploadProgressMessage feedImportStatusMessage = uploadProgressService.addUploadStatus(options.getUploadKey(), "Validating Feed import.");
         boolean isValid = ZipFileUtil.validateZipEntriesWithRequiredEntries(content, getValidZipFileEntries(), Sets.newHashSet(FEED_JSON_FILE));
@@ -268,7 +268,7 @@ public class ExportImportFeedService {
      * @return the feed data to import
      */
     public ImportFeed importFeed(String fileName, byte[] content, ImportFeedOptions importOptions) throws Exception {
-        this.accessController.checkPermission(AccessController.SERVICES, FeedsAccessControl.IMPORT_FEEDS);
+        this.accessController.checkPermission(AccessController.SERVICES, FeedServicesAccessControl.IMPORT_FEEDS);
         UploadProgress progress = uploadProgressService.getUploadStatus(importOptions.getUploadKey());
         progress.setSections(ImportSection.sectionsForImportAsString(ImportType.FEED));
 

@@ -253,7 +253,7 @@ public class FeedModelTransform {
         return feedMetadata;
     }
 
-    public FeedMetadata deserializeFeedMetadata(FeedManagerFeed domain) {
+    public FeedMetadata deserializeFeedMetadata(Feed domain) {
         return deserializeFeedMetadata(domain, true);
     }
 
