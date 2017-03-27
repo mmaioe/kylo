@@ -61,13 +61,17 @@ public class FeedTestUtil {
     public Category findOrCreateCategory(String categorySystemName) {
         Category category = categoryProvider.findBySystemName(categorySystemName);
         if (category == null) {
-            JcrCategory cat = (JcrCategory) categoryProvider.ensureCategory(categorySystemName);
-            cat.setDescription(categorySystemName + " desc");
-            cat.setTitle(categorySystemName);
-            categoryProvider.update(cat);
-            category = cat;
+          category = createCategory(categorySystemName);
         }
         return category;
+    }
+
+    public Category createCategory(String categorySystemName){
+        JcrCategory cat = (JcrCategory) categoryProvider.ensureCategory(categorySystemName);
+        cat.setDescription(categorySystemName + " desc");
+        cat.setTitle(categorySystemName);
+        categoryProvider.update(cat);
+        return cat;
     }
 
     public Feed findOrCreateFeed(String categorySystemName, String feedSystemName, String feedTemplate) {
@@ -79,9 +83,21 @@ public class FeedTestUtil {
         return feedProvider.update(feed);
     }
 
+    public Feed findOrCreateFeed(Category category, String feedSystemName,FeedManagerTemplate template) {
+        Feed feed = feedProvider.ensureFeed(category.getId(), feedSystemName);
+        feed.setDisplayName(feedSystemName);
+        feed.setTemplate(template);
+        feed.setJson(sampleFeedJson());
+        return feedProvider.update(feed);
+    }
+
     public Feed findFeed(String categorySystemName, String feedSystemName) {
         Feed feed = feedProvider.findBySystemName(categorySystemName, feedSystemName);
         return feed;
+    }
+
+    private String sampleFeedJson(){
+        return "";
     }
 
     /**

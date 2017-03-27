@@ -22,12 +22,16 @@ package com.thinkbiganalytics.feedmgr.rest.controller;
 
 import com.google.common.collect.Lists;
 import com.mifmif.common.regex.Generex;
+import com.thinkbiganalytics.annotations.AnnotatedFieldProperty;
+import com.thinkbiganalytics.annotations.AnnotationFieldNameResolver;
 import com.thinkbiganalytics.discovery.schema.QueryResult;
+import com.thinkbiganalytics.feedmgr.rest.model.EditFeedEntity;
 import com.thinkbiganalytics.feedmgr.rest.model.FeedMetadata;
 import com.thinkbiganalytics.feedmgr.rest.model.FeedSummary;
 import com.thinkbiganalytics.feedmgr.rest.model.NifiFeed;
 import com.thinkbiganalytics.feedmgr.rest.model.RegisteredTemplate;
 import com.thinkbiganalytics.feedmgr.rest.model.UIFeed;
+import com.thinkbiganalytics.feedmgr.rest.model.schema.EditFeedAction;
 import com.thinkbiganalytics.feedmgr.service.FeedCleanupFailedException;
 import com.thinkbiganalytics.feedmgr.service.FeedCleanupTimeoutException;
 import com.thinkbiganalytics.feedmgr.service.MetadataService;
@@ -35,9 +39,12 @@ import com.thinkbiganalytics.feedmgr.service.datasource.DatasourceService;
 import com.thinkbiganalytics.feedmgr.service.feed.DuplicateFeedNameException;
 import com.thinkbiganalytics.feedmgr.service.feed.FeedManagerPreconditionService;
 import com.thinkbiganalytics.feedmgr.service.security.SecurityService;
+import com.thinkbiganalytics.feedmgr.service.template.RegisteredTemplateService;
 import com.thinkbiganalytics.feedmgr.sla.ServiceLevelAgreementService;
 import com.thinkbiganalytics.hive.service.HiveService;
 import com.thinkbiganalytics.hive.util.HiveUtils;
+import com.thinkbiganalytics.metadata.FeedPropertySection;
+import com.thinkbiganalytics.metadata.FeedPropertyType;
 import com.thinkbiganalytics.metadata.rest.model.data.DatasourceDefinition;
 import com.thinkbiganalytics.metadata.rest.model.data.DatasourceDefinitions;
 import com.thinkbiganalytics.metadata.rest.model.feed.FeedLineageStyle;
@@ -46,6 +53,7 @@ import com.thinkbiganalytics.nifi.rest.client.LegacyNifiRestClient;
 import com.thinkbiganalytics.nifi.rest.client.NifiClientRuntimeException;
 import com.thinkbiganalytics.nifi.rest.model.NifiProperty;
 import com.thinkbiganalytics.nifi.rest.support.NifiPropertyUtil;
+import com.thinkbiganalytics.policy.PolicyProperty;
 import com.thinkbiganalytics.policy.rest.model.PreconditionRule;
 import com.thinkbiganalytics.rest.model.RestResponseStatus;
 import com.thinkbiganalytics.security.rest.controller.ActionsModelTransform;
@@ -53,7 +61,9 @@ import com.thinkbiganalytics.security.rest.model.ActionGroup;
 import com.thinkbiganalytics.security.rest.model.PermissionsChange;
 import com.thinkbiganalytics.security.rest.model.PermissionsChange.ChangeType;
 
+import org.apache.commons.beanutils.BeanUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.glassfish.jersey.media.multipart.FormDataContentDisposition;
 import org.glassfish.jersey.media.multipart.FormDataParam;
 import org.hibernate.JDBCException;
@@ -62,11 +72,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DataAccessException;
+import org.springframework.data.util.ReflectionUtils;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Field;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -151,8 +163,85 @@ public class FeedRestController {
     @Inject
     ServiceLevelAgreementService serviceLevelAgreementService;
 
+    @Inject
+    RegisteredTemplateService registeredTemplateService;
+
     private MetadataService getMetadataService() {
         return metadataService;
+    }
+
+
+
+
+
+
+    /**
+     * Creates a new Feed using the specified metadata.
+     *
+     * @param editFeedEntity the feed metadata
+     * @return the feed
+     */
+    @POST
+    @Path("/edit/{feedId}")
+    @Consumes({MediaType.APPLICATION_JSON, MediaType.APPLICATION_FORM_URLENCODED})
+    @Produces(MediaType.APPLICATION_JSON)
+    @ApiOperation("Creates or updates a feed.")
+    @ApiResponses(
+        @ApiResponse(code = 200, message = "Returns the feed including any error messages.", response = NifiFeed.class)
+    )
+    @Nonnull
+    public Response editFeed(@Nonnull final EditFeedEntity editFeedEntity) {
+
+
+
+        return createFeed(editFeedEntity.getFeedMetadata());
+    }
+
+    private void populateFeed(EditFeedEntity editFeedEntity){
+        //fetch the feed
+        FeedMetadata feed = getMetadataService().getFeedById(editFeedEntity.getFeedMetadata().getFeedId());
+        FeedMetadata editFeed = editFeedEntity.getFeedMetadata();
+        switch (editFeedEntity.getAction()) {
+            case SUMMARY:
+                updateFeedMetadata(feed,editFeed,FeedPropertySection.SUMMARY);
+                break;
+            case NIFI_PROPERTIES:
+                updateFeedMetadata(feed,editFeed,FeedPropertySection.NIFI_PROPERTIES);
+                break;
+            case PROPERTIES:
+                updateFeedMetadata(feed,editFeed,FeedPropertySection.PROPERTIES);
+                break;
+            case TABLE_DATA:
+                updateFeedMetadata(feed,editFeed,FeedPropertySection.TABLE_DATA);
+                break;
+            case SCHEDULE:
+                updateFeedMetadata(feed,editFeed,FeedPropertySection.SCHEDULE);
+                break;
+            default:
+                break;
+        }
+
+        createFeed(feed);
+    }
+
+    private void updateFeedMetadata(FeedMetadata targetFeedMetadata, FeedMetadata modifiedFeedMetadata, FeedPropertySection feedPropertySection){
+
+        AnnotationFieldNameResolver annotationFieldNameResolver = new AnnotationFieldNameResolver(FeedPropertyType.class);
+        List<AnnotatedFieldProperty> list = annotationFieldNameResolver.getProperties(FeedMetadata.class);
+        List<AnnotatedFieldProperty> sectionList =  list.stream().filter(annotatedFieldProperty -> feedPropertySection.equals(((FeedPropertyType)annotatedFieldProperty.getAnnotation()).section())).collect(Collectors.toList());
+        sectionList.forEach(annotatedFieldProperty -> {
+            try {
+                Object value = FieldUtils.readField(annotatedFieldProperty.getField(), modifiedFeedMetadata);
+                FieldUtils.writeField(annotatedFieldProperty.getField(), targetFeedMetadata, value);
+            }
+            catch(IllegalAccessException e){
+                e.printStackTrace();
+            }
+        });
+
+
+
+
     }
 
     /**
@@ -177,7 +266,7 @@ public class FeedRestController {
             log.info("Failed to create a new feed due to another feed having the same category/feed name: " + feedMetadata.getCategoryAndFeedDisplayName());
 
             // Create an error message
-            String msg = "A feed already exists in the cantegory \"" + e.getCategoryName() + "\" with name name \"" + e.getFeedName() + "\"";
+            String msg = "A feed already exists in the category \"" + e.getCategoryName() + "\" with name name \"" + e.getFeedName() + "\"";
 
             // Add error message to feed
             feed = new NifiFeed(feedMetadata, null);
@@ -320,77 +409,12 @@ public class FeedRestController {
                       @ApiResponse(code = 500, message = "The feed could not be updated.", response = RestResponseStatus.class)
                   })
     public Response mergeTemplate(@PathParam("feedId") String feedId, FeedMetadata feed) {
-        //gets the feed data and then gets the latest template associated with that feed and merges the properties into the feed
-        RegisteredTemplate registeredTemplate = null;
-        try {
-            registeredTemplate = getMetadataService().getRegisteredTemplateWithAllProperties(feed.getTemplateId(), feed.getTemplateName());
-        } catch (Exception e) {
-            registeredTemplate = getMetadataService().getRegisteredTemplateByName(feed.getTemplateName());
-            if (registeredTemplate != null) {
-                feed.setTemplateId(registeredTemplate.getId());
-            }
-        }
-        if (registeredTemplate != null) {
-            NifiPropertyUtil
-                .matchAndSetPropertyByProcessorName(registeredTemplate.getProperties(), feed.getProperties(), NifiPropertyUtil.PROPERTY_MATCH_AND_UPDATE_MODE.UPDATE_NON_EXPRESSION_PROPERTIES);
-
-            //detect template properties that dont match the feed.properties from the registeredtemplate
-            ensureFeedPropertiesExistInTemplate(feed, registeredTemplate);
-            feed.setProperties(registeredTemplate.getProperties());
-
-        }
-        registeredTemplate.initializeProcessors();
-        feed.setRegisteredTemplate(registeredTemplate);
-
+        registeredTemplateService.mergeTemplatePropertiesWithFeed(feed);
         return Response.ok(feed).build();
     }
 
 
-    /**
-     * If a Template changes the Processor Names the Feed Properties will no longer be associated to the correct processors This will match any feed properties to a whose processor name has changed in
-     * the template to the template processor/property based upon the template processor type.
-     */
-    private void ensureFeedPropertiesExistInTemplate(FeedMetadata feed, RegisteredTemplate registeredTemplate) {
-        Set<String> templateProcessors = registeredTemplate.getProperties().stream().map(property -> property.getProcessorName()).collect(Collectors.toSet());
 
-        //Store the template Properties
-        Map<String, String> templateProcessorIdProcessorNameMap = new HashMap<>();
-        Map<String, String> templateProcessorTypeProcessorIdMap = new HashMap<>();
-        registeredTemplate.getProperties().stream().filter(property -> !templateProcessorIdProcessorNameMap.containsKey(property.getProcessorId())).forEach(property1 -> {
-            templateProcessorIdProcessorNameMap.put(property1.getProcessorId(), property1.getProcessorName());
-            templateProcessorTypeProcessorIdMap.put(property1.getProcessorType(), property1.getProcessorId());
-        });
-
-        Map<String, Map<String, NifiProperty>> templatePropertiesByProcessorIdMap = new HashMap<>();
-        registeredTemplate.getProperties().stream().forEach(property -> {
-            templatePropertiesByProcessorIdMap.computeIfAbsent(property.getProcessorId(), key -> new HashMap<String, NifiProperty>()).put(property.getKey(), property);
-        });
-
-        //store the Feed Properties
-        Map<String, String> processorIdProcessorTypeMap = new HashMap<>();
-        feed.getProperties().stream().filter(property -> !processorIdProcessorTypeMap.containsKey(property.getProcessorId())).forEach(property1 -> {
-            processorIdProcessorTypeMap.put(property1.getProcessorId(), property1.getProcessorType());
-        });
-
-        feed.getProperties().stream().filter(property -> !templateProcessors.contains(property.getProcessorName())).forEach(property -> {
-            //if the property doesn't match the template but the type matches try to merge in the feed properties overwriting the template ones
-            String processorType = processorIdProcessorTypeMap.get(property.getProcessorId());
-            if (processorType != null) {
-                String templateProcessorId = templateProcessorTypeProcessorIdMap.get(processorType);
-
-                if (templateProcessorId != null && templateProcessorIdProcessorNameMap.containsKey(templateProcessorId)) {
-                    NifiProperty templateProperty = templatePropertiesByProcessorIdMap.get(templateProcessorId).get(property.getKey());
-                    if (templateProperty != null) {
-                        templateProperty.setValue(property.getValue());
-                        templateProperty.setRenderType(property.getRenderType());
-                        templateProperty.setRenderOptions(property.getRenderOptions());
-                    }
-                }
-            }
-        });
-
-
-    }
 
     @GET
     @Path("/{feedId}/profile-summary")
@@ -492,7 +516,7 @@ public class FeedRestController {
         FeedMetadata feedMetadata = getMetadataService().getFeedById(feedId);
         return getPage(processingdttm, limit, feedMetadata.getValidTableName());
     }
-    
+
     @GET
     @Path("{feedId}/actions/available")
     @Produces(MediaType.APPLICATION_JSON)
@@ -508,7 +532,7 @@ public class FeedRestController {
                         .map(g -> Response.ok(g).build())
                         .orElseThrow(() -> new WebApplicationException("A feed with the given ID does not exist: " + feedIdStr, Status.NOT_FOUND));
     }
-    
+
     @GET
     @Path("{feedId}/actions/allowed")
     @Produces(MediaType.APPLICATION_JSON)
@@ -521,7 +545,7 @@ public class FeedRestController {
                                          @QueryParam("user") Set<String> userNames,
                                          @QueryParam("group") Set<String> groupNames) {
         log.debug("Get allowed actions for feed: {}", feedIdStr);
-        
+
         Set<Principal> users = this.actionsTransform.toUserPrincipals(userNames);
         Set<Principal> groups = this.actionsTransform.toGroupPrincipals(groupNames);
 
@@ -529,7 +553,7 @@ public class FeedRestController {
                         .map(g -> Response.ok(g).build())
                         .orElseThrow(() -> new WebApplicationException("A feed with the given ID does not exist: " + feedIdStr, Status.NOT_FOUND));
     }
-    
+
     @POST
     @Path("{feedId}/actions/allowed")
     @Consumes(MediaType.APPLICATION_JSON)
@@ -547,7 +571,7 @@ public class FeedRestController {
                         .map(g -> Response.ok(g).build())
                         .orElseThrow(() -> new WebApplicationException("A feed with the given ID does not exist: " + feedIdStr, Status.NOT_FOUND));
     }
-    
+
     @GET
     @Path("{feedId}/actions/change")
     @Produces(MediaType.APPLICATION_JSON)
@@ -568,8 +592,8 @@ public class FeedRestController {
         Set<Principal> users = this.actionsTransform.toUserPrincipals(userNames);
         Set<Principal> groups = this.actionsTransform.toGroupPrincipals(groupNames);
 
-        return this.securityService.createFeedPermissionChange(feedIdStr, 
-                                                               ChangeType.valueOf(changeType.toUpperCase()), 
+        return this.securityService.createFeedPermissionChange(feedIdStr,
+                                                               ChangeType.valueOf(changeType.toUpperCase()),
                                                                Stream.concat(users.stream(), groups.stream()).collect(Collectors.toSet()))
                         .orElseThrow(() -> new WebApplicationException("A feed with the given ID does not exist: " + feedIdStr, Status.NOT_FOUND));
     }

@@ -22,13 +22,23 @@ package com.thinkbiganalytics.feedmgr.rest.model;
 
 public class ImportFeedOptions extends ImportOptions {
 
-    private boolean overwriteFeedTemplate;
+    private boolean disableUponImport;
 
-    public boolean isOverwriteFeedTemplate() {
-        return overwriteFeedTemplate;
+    private String categorySystemName;
+
+    public String getCategorySystemName() {
+        return categorySystemName;
     }
 
-    public void setOverwriteFeedTemplate(boolean overwriteFeedTemplate) {
-        this.overwriteFeedTemplate = overwriteFeedTemplate;
+    public void setCategorySystemName(String categorySystemName) {
+        this.categorySystemName = categorySystemName;
+    }
+
+    public boolean isDisableUponImport() {
+        return disableUponImport;
+    }
+
+    public void setDisableUponImport(boolean disableUponImport) {
+        this.disableUponImport = disableUponImport;
     }
 }

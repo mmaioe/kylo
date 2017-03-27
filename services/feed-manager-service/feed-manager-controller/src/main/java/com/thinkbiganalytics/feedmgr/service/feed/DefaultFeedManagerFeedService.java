@@ -157,13 +157,13 @@ public class DefaultFeedManagerFeedService extends AbstractFeedManagerFeedServic
     public void removeEventListener() {
         metadataEventService.removeListener(feedPropertyChangeListener);
     }
-    
+
     @Override
     public boolean checkFeedPermission(String id, Action action, Action... more) {
         return metadataAccess.read(() -> {
             Feed.ID domainId = feedProvider.resolveId(id);
             Feed domainFeed = feedProvider.findById(domainId);
-            
+
             if (domainFeed != null) {
                 domainFeed.getAllowedActions().checkPermission(action, more);
                 return true;
@@ -293,15 +293,7 @@ public class DefaultFeedManagerFeedService extends AbstractFeedManagerFeedServic
         });
     }
 
-    @Override
-    protected RegisteredTemplate getRegisteredTemplateWithAllProperties(final String templateId) {
-        return metadataAccess.read(() -> {
-            this.accessController.checkPermission(AccessController.SERVICES, FeedServicesAccessControl.ACCESS_FEEDS);
 
-            return templateRestProvider.getRegisteredTemplate(templateId);
-        });
-
-    }
 
     @Override
     public Feed.ID resolveFeed(@Nonnull Serializable fid) {
@@ -522,7 +514,7 @@ public class DefaultFeedManagerFeedService extends AbstractFeedManagerFeedServic
             Feed domainFeed = feedProvider.findById(feedId);
             FeedMetadata feedMetadata = null;
             if (domainFeed != null) {
-                feedMetadata = feedModelTransform.deserializeFeedMetadata(domainFeed);
+                feedMetadata = feedModelTransform.deserializeFeedMetadata(domainFeed,true);
                 feedMetadata.setState(FeedMetadata.STATE.ENABLED.name());
                 domainFeed.setJson(ObjectMapperSerializer.serialize(feedMetadata));
                 feedProvider.update(domainFeed);
@@ -546,7 +538,7 @@ public class DefaultFeedManagerFeedService extends AbstractFeedManagerFeedServic
             Feed domainFeed = feedProvider.findById(feedId);
             FeedMetadata feedMetadata = null;
             if (domainFeed != null) {
-                feedMetadata = feedModelTransform.deserializeFeedMetadata(domainFeed);
+                feedMetadata = feedModelTransform.deserializeFeedMetadata(domainFeed,false);
                 feedMetadata.setState(FeedMetadata.STATE.DISABLED.name());
                 domainFeed.setJson(ObjectMapperSerializer.serialize(feedMetadata));
                 feedProvider.update(domainFeed);

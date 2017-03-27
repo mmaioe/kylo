@@ -23,6 +23,7 @@ package com.thinkbiganalytics.feedmgr.service.template;
 import com.google.common.base.Function;
 import com.google.common.collect.Collections2;
 import com.thinkbiganalytics.feedmgr.rest.model.RegisteredTemplate;
+import com.thinkbiganalytics.feedmgr.service.EncryptionService;
 import com.thinkbiganalytics.json.ObjectMapperSerializer;
 import com.thinkbiganalytics.metadata.api.feed.Feed;
 import com.thinkbiganalytics.metadata.api.template.FeedManagerTemplate;
@@ -44,14 +45,54 @@ import javax.inject.Inject;
 public class TemplateModelTransform {
 
     @Inject
+    private EncryptionService encryptionService;
+
+    public enum TEMPLATE_TRANSFORMATION_TYPE {
+        WITH_FEED_NAMES, WITHOUT_FEED_NAMES, WITH_SENSITIVE_DATA
+    }
+
+
+    private void prepareForSave(RegisteredTemplate registeredTemplate) {
+        //mark password rendertypes as sensitive
+        registeredTemplate.getProperties().stream().filter(p -> "password".equalsIgnoreCase(p.getRenderType())).forEach(p -> p.setSensitive(true));
+        encryptSensitivePropertyValues(registeredTemplate);
+    }
+
+    private void encryptSensitivePropertyValues(RegisteredTemplate registeredTemplate) {
+        registeredTemplate.getProperties().stream().filter(property -> property.isSensitive()).forEach(nifiProperty -> nifiProperty.setValue(encryptionService.encrypt(nifiProperty.getValue())));
+    }
+
+
+    public final Function<FeedManagerTemplate, RegisteredTemplate>
+        DOMAIN_TO_REGISTERED_TEMPLATE = DOMAIN_TO_REGISTERED_TEMPLATE(true, false);
+
+    public final Function<FeedManagerTemplate, RegisteredTemplate>
+        DOMAIN_TO_REGISTERED_TEMPLATE_WITHOUT_FEED_NAMES = DOMAIN_TO_REGISTERED_TEMPLATE(false, false);
+
+    public final Function<FeedManagerTemplate, RegisteredTemplate>
+        DOMAIN_TO_REGISTERED_TEMPLATE_WITH_SENSITIVE_DATA = DOMAIN_TO_REGISTERED_TEMPLATE(true, true);
+
+
+    public Function<FeedManagerTemplate, RegisteredTemplate> getTransformationFunction(TEMPLATE_TRANSFORMATION_TYPE transformationType) {
+        switch (transformationType) {
+            case WITH_FEED_NAMES:
+                return DOMAIN_TO_REGISTERED_TEMPLATE;
+            case WITH_SENSITIVE_DATA:
+                return DOMAIN_TO_REGISTERED_TEMPLATE_WITH_SENSITIVE_DATA;
+            case WITHOUT_FEED_NAMES:
+                return DOMAIN_TO_REGISTERED_TEMPLATE_WITHOUT_FEED_NAMES;
+            default:
+                return DOMAIN_TO_REGISTERED_TEMPLATE;
+        }
+    }
+
+    @Inject
     FeedManagerTemplateProvider templateProvider;
-    
+
     @Inject
     private ActionsModelTransform actionsTransform;
-    
-    public final Function<FeedManagerTemplate, RegisteredTemplate>
-        DOMAIN_TO_REGISTERED_TEMPLATE = DOMAIN_TO_REGISTERED_TEMPLATE(true);
-    
+
+
     public final Function<RegisteredTemplate, FeedManagerTemplate>
         REGISTERED_TEMPLATE_TO_DOMAIN =
         new Function<RegisteredTemplate, FeedManagerTemplate>() {
@@ -69,7 +110,7 @@ public class TemplateModelTransform {
                 domainId = domain.getId();
                 //clean the order from the template
                 registeredTemplate.setTemplateOrder(null);
-                String json = ObjectMapperSerializer.serialize(registeredTemplate);
+
                 domain.setNifiTemplateId(registeredTemplate.getNifiTemplateId());
                 domain.setAllowPreconditions(registeredTemplate.isAllowPreconditions());
                 domain.setName(registeredTemplate.getTemplateName());
@@ -80,6 +121,8 @@ public class TemplateModelTransform {
                 domain.setDescription(registeredTemplate.getDescription());
                 domain.setOrder(registeredTemplate.getOrder());
                 domain.setStream(registeredTemplate.isStream());
+                prepareForSave(registeredTemplate);
+                String json = ObjectMapperSerializer.serialize(registeredTemplate);
                 domain.setJson(json);
                 FeedManagerTemplate.State state = FeedManagerTemplate.State.ENABLED;
                 try {
@@ -97,14 +140,36 @@ public class TemplateModelTransform {
             }
         };
 
+
+    /**
+     * Deserialize the JSON of the template
+     *
+     * @param json                       the template json
+     * @param includeEncryptedProperties if true the encrypted properties will be returned.  false will set the property values to ""
+     * @return the registered template
+     */
+    private RegisteredTemplate deserialize(String json, boolean includeEncryptedProperties) {
+        RegisteredTemplate template = ObjectMapperSerializer.deserialize(json, RegisteredTemplate.class);
+        template.getProperties().stream().filter(nifiProperty -> nifiProperty.isSensitive()).forEach(nifiProperty -> {
+            if (!includeEncryptedProperties) {
+                nifiProperty.setValue("");
+            }
+            // else {
+            //    String val = encryptionService.decrypt(nifiProperty.getValue());
+            //   nifiProperty.setValue(val);
+            //}
+        });
+        return template;
+    }
+
     public final Function<FeedManagerTemplate, RegisteredTemplate>
-    DOMAIN_TO_REGISTERED_TEMPLATE(boolean includeFeedNames) {
+    DOMAIN_TO_REGISTERED_TEMPLATE(boolean includeFeedNames, boolean includeEncryptedProperties) {
 
         return new Function<FeedManagerTemplate, RegisteredTemplate>() {
             @Override
             public RegisteredTemplate apply(FeedManagerTemplate domain) {
                 String json = domain.getJson();
-                RegisteredTemplate template = ObjectMapperSerializer.deserialize(json, RegisteredTemplate.class);
+                RegisteredTemplate template = deserialize(json, includeEncryptedProperties);
                 template.setId(domain.getId().toString());
                 template.setState(domain.getState().name());
                 template.setNifiTemplateId(domain.getNifiTemplateId());
@@ -122,10 +187,10 @@ public class TemplateModelTransform {
                     template.setUpdateDate(domain.getModifiedTime().toDate());
                 }
                 template.setOrder(domain.getOrder());
-                
+
                 ActionGroup group = actionsTransform.allowedActionsToActionSet(null).apply(domain.getAllowedActions());
                 template.setAllowedActions(group);
-                
+
                 return template;
             }
         };
@@ -133,20 +198,20 @@ public class TemplateModelTransform {
     }
 
     public List<RegisteredTemplate> domainToRegisteredTemplateWithFeedNames(Collection<FeedManagerTemplate> domain) {
-        return new ArrayList<>(Collections2.transform(domain, DOMAIN_TO_REGISTERED_TEMPLATE(true)));
+        return new ArrayList<>(Collections2.transform(domain, DOMAIN_TO_REGISTERED_TEMPLATE));
     }
 
     public List<RegisteredTemplate> domainToRegisteredTemplate(Collection<FeedManagerTemplate> domain) {
-        return new ArrayList<>(Collections2.transform(domain, DOMAIN_TO_REGISTERED_TEMPLATE(false)));
+        return new ArrayList<>(Collections2.transform(domain, DOMAIN_TO_REGISTERED_TEMPLATE_WITHOUT_FEED_NAMES));
     }
 
     public RegisteredTemplate domainToRegisteredTemplateWithFeedNames(FeedManagerTemplate domain) {
-        return DOMAIN_TO_REGISTERED_TEMPLATE(true).apply(domain);
+        return DOMAIN_TO_REGISTERED_TEMPLATE.apply(domain);
     }
 
 
     public RegisteredTemplate domainToRegisteredTemplate(FeedManagerTemplate domain) {
-        return DOMAIN_TO_REGISTERED_TEMPLATE(false).apply(domain);
+        return DOMAIN_TO_REGISTERED_TEMPLATE_WITHOUT_FEED_NAMES.apply(domain);
     }
 
     public List<FeedManagerTemplate> registeredTemplateToDomain(Collection<RegisteredTemplate> registeredTemplates) {

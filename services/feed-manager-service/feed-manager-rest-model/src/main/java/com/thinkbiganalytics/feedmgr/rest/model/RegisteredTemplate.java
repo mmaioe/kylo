@@ -405,6 +405,15 @@ public class RegisteredTemplate {
         this.isStream = isStream;
     }
 
+
+    public List<NifiProperty> getConfigurationProperties(){
+        return getProperties().stream().filter(nifiProperty -> nifiProperty.isContainsConfigurationVariables()).collect(Collectors.toList());
+    }
+
+    public List<NifiProperty> getSensitiveProperties(){
+        return getProperties().stream().filter(nifiProperty -> nifiProperty.isSensitive()).collect(Collectors.toList());
+    }
+
     public static class FlowProcessor extends RegisteredTemplate.Processor {
 
         private String flowId;
@@ -548,7 +557,10 @@ public class RegisteredTemplate {
         }
 
 
+
     }
+
+
 
 
 }

@@ -24,27 +24,22 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.thinkbiganalytics.feedmgr.nifi.NifiFlowCache;
-import com.thinkbiganalytics.feedmgr.rest.model.FeedCategory;
-import com.thinkbiganalytics.feedmgr.rest.model.FeedMetadata;
 import com.thinkbiganalytics.feedmgr.rest.model.NiFiTemplateFlowRequest;
 import com.thinkbiganalytics.feedmgr.rest.model.NiFiTemplateFlowResponse;
 import com.thinkbiganalytics.feedmgr.rest.model.RegisteredTemplate;
-import com.thinkbiganalytics.feedmgr.rest.model.ReusableTemplateConnectionInfo;
+import com.thinkbiganalytics.feedmgr.rest.model.RegisteredTemplateRequest;
 import com.thinkbiganalytics.feedmgr.rest.model.TemplateDtoWrapper;
 import com.thinkbiganalytics.feedmgr.rest.model.TemplateOrder;
 import com.thinkbiganalytics.feedmgr.rest.model.TemplateProcessorDatasourceDefinition;
-import com.thinkbiganalytics.feedmgr.rest.support.SystemNamingService;
 import com.thinkbiganalytics.feedmgr.service.MetadataService;
 import com.thinkbiganalytics.feedmgr.service.datasource.DatasourceService;
 import com.thinkbiganalytics.feedmgr.service.security.SecurityService;
 import com.thinkbiganalytics.feedmgr.service.template.FeedManagerTemplateService;
+import com.thinkbiganalytics.feedmgr.service.template.RegisteredTemplateService;
 import com.thinkbiganalytics.metadata.rest.model.data.DatasourceDefinition;
-import com.thinkbiganalytics.nifi.feedmgr.TemplateCreationHelper;
 import com.thinkbiganalytics.nifi.rest.client.LegacyNifiRestClient;
-import com.thinkbiganalytics.nifi.rest.client.NifiComponentNotFoundException;
 import com.thinkbiganalytics.nifi.rest.model.NifiProperty;
 import com.thinkbiganalytics.nifi.rest.support.NifiConstants;
-import com.thinkbiganalytics.nifi.rest.support.NifiPropertyUtil;
 import com.thinkbiganalytics.rest.model.RestResponseStatus;
 import com.thinkbiganalytics.security.rest.controller.ActionsModelTransform;
 import com.thinkbiganalytics.security.rest.model.ActionGroup;
@@ -118,6 +113,9 @@ public class TemplatesRestController {
     private ActionsModelTransform actionsTransform;
 
     @Inject
+    RegisteredTemplateService registeredTemplateService;
+
+    @Inject
     NifiFlowCache nifiFlowCache;
 
     private MetadataService getMetadataService() {
@@ -125,6 +123,9 @@ public class TemplatesRestController {
     }
 
 
+    /**
+     * This will list all the templates registered in Kylo
+     */
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     @ApiOperation("Gets the list of all templates.")
@@ -135,8 +136,14 @@ public class TemplatesRestController {
     public Response getTemplates(@QueryParam("includeDetails") boolean includeDetails) {
         Set<TemplateDTO> nifiTemplates = nifiRestClient.getTemplates(includeDetails);
         Set<TemplateDtoWrapper> dtos = new HashSet<>();
+        List<RegisteredTemplate> registeredTemplates = registeredTemplateService.getRegisteredTemplates();
         for (final TemplateDTO dto : nifiTemplates) {
-            RegisteredTemplate match = metadataService.getRegisteredTemplateForNifiProperties(dto.getId(), dto.getName());
+
+            RegisteredTemplate
+                match =
+                registeredTemplates.stream().filter(template -> template.getNifiTemplateId().equalsIgnoreCase(dto.getId()) || template.getTemplateName().equalsIgnoreCase(dto.getName())).findFirst()
+                    .orElse(null);
+
             TemplateDtoWrapper wrapper = new TemplateDtoWrapper(dto);
             if (match != null) {
                 wrapper.setRegisteredTemplateId(match.getId());
@@ -146,6 +153,9 @@ public class TemplatesRestController {
         return Response.ok(dtos).build();
     }
 
+    /**
+     * This will populate the select drop down when a user asks to register a new template
+     */
     @GET
     @Path("/unregistered")
     @Produces(MediaType.APPLICATION_JSON)
@@ -156,11 +166,12 @@ public class TemplatesRestController {
                   })
     public Response getUnregisteredTemplates(@QueryParam("includeDetails") boolean includeDetails) {
         Set<TemplateDTO> nifiTemplates = nifiRestClient.getTemplates(includeDetails);
-        List<RegisteredTemplate> registeredTemplates = metadataService.getRegisteredTemplates();
+        //List<RegisteredTemplate> registeredTemplates = metadataService.getRegisteredTemplates();
 
         Set<TemplateDtoWrapper> dtos = new HashSet<>();
         for (final TemplateDTO dto : nifiTemplates) {
-            RegisteredTemplate match = metadataService.getRegisteredTemplateForNifiProperties(dto.getId(), dto.getName());
+            RegisteredTemplate match = registeredTemplateService.findRegisteredTemplate(
+                RegisteredTemplateRequest.requestByNiFiTemplateProperties(dto.getId(), dto.getName()));
             if (match == null) {
                 dtos.add(new TemplateDtoWrapper(dto));
             }
@@ -231,53 +242,6 @@ public class TemplatesRestController {
     public Response getNiFiTemplateProcessors(@PathParam("templateId") String templateId) {
         List<RegisteredTemplate.Processor> processorProperties = feedManagerTemplateService.getNiFiTemplateProcessorsWithProperties(templateId);
         return Response.ok(processorProperties).build();
-    }
-
-    /**
-     * Gets a templates datasource definitions
-     * This is now all done in the {@link #getNiFiTemplateFlowInfo}
-     */
-    @Deprecated
-    @GET
-    @Path("/nifi/{templateId}/datasource-definitions")
-    @Produces(MediaType.APPLICATION_JSON)
-    @ApiOperation("Gets the datasource definitions for the specified template.")
-    @ApiResponses({
-                      @ApiResponse(code = 200, message = "Returns the datasource definitions.", response = TemplateProcessorDatasourceDefinition.class, responseContainer = "List"),
-                      @ApiResponse(code = 500, message = "NiFi is unavailable.", response = RestResponseStatus.class)
-                  })
-    public Response getDatasourceDefinitionsForProcessors(@PathParam("templateId") String templateId, @QueryParam("inputPorts") String inputPortIds) {
-        List<TemplateProcessorDatasourceDefinition> templateProcessorDatasourceDefinitions = new ArrayList<>();
-
-        if (StringUtils.isNotBlank(templateId)) {
-            List<RegisteredTemplate.Processor> processors = new ArrayList<>();
-            List<RegisteredTemplate.Processor> reusableProcessors = getReusableTemplateProcessorsForInputPorts(inputPortIds);
-
-            List<RegisteredTemplate.FlowProcessor> thisTemplateProcessors = feedManagerTemplateService.getNiFiTemplateFlowProcessors(templateId, null);
-
-            Set<DatasourceDefinition> defs = datasourceService.getDatasourceDefinitions();
-            Map<String, DatasourceDefinition> datasourceDefinitionMap = new HashMap<>();
-            if (defs != null) {
-                defs.stream().forEach(def -> datasourceDefinitionMap.put(def.getProcessorType(), def));
-            }
-
-            //join the two lists
-            processors.addAll(thisTemplateProcessors);
-            processors.addAll(reusableProcessors);
-
-            templateProcessorDatasourceDefinitions = processors.stream().filter(processor -> datasourceDefinitionMap.containsKey(processor.getType())).map(p -> {
-                TemplateProcessorDatasourceDefinition definition = new TemplateProcessorDatasourceDefinition();
-                definition.setProcessorType(p.getType());
-                definition.setProcessorName(p.getName());
-                definition.setProcessorId(p.getId());
-                definition.setDatasourceDefinition(datasourceDefinitionMap.get(p.getType()));
-                return definition;
-            }).collect(Collectors.toList());
-        }
-
-        return Response.ok(templateProcessorDatasourceDefinitions).build();
-
-
     }
 
 
@@ -389,9 +353,7 @@ public class TemplatesRestController {
     )
     public List<RegisteredTemplate.Processor> getReusableTemplateProcessorsForInputPorts(@PathParam("templateId") String templateId,
                                                                                          @QueryParam("includeReusableTemplates") boolean includeReusableTemplates) {
-        List<RegisteredTemplate.Processor> processorProperties = new ArrayList<>();
-
-        processorProperties = feedManagerTemplateService.getRegisteredTemplateProcessors(templateId, includeReusableTemplates);
+        List<RegisteredTemplate.Processor> processorProperties = feedManagerTemplateService.getRegisteredTemplateProcessors(templateId, includeReusableTemplates);
 
         return processorProperties;
     }
@@ -414,9 +376,7 @@ public class TemplatesRestController {
     }
 
     /**
-     * get a registeredTemplate
-     *
-     * @
+     * get a registeredTemplate for updating
      */
     @GET
     @Path("/registered/{templateId}")
@@ -428,76 +388,12 @@ public class TemplatesRestController {
                   })
     public Response getRegisteredTemplate(@PathParam("templateId") String templateId, @QueryParam("allProperties") boolean allProperties, @QueryParam("feedName") String feedName,
                                           @QueryParam("templateName") String templateName) {
-        RegisteredTemplate registeredTemplate = null;
-        if (allProperties) {
-            registeredTemplate = getMetadataService().getRegisteredTemplateWithAllProperties(templateId, templateName);
-        } else {
-            registeredTemplate = getMetadataService().getRegisteredTemplate(templateId);
-        }
 
-        log.info("Returning Registered template for id {} as {} ", templateId, (registeredTemplate != null ? registeredTemplate.getTemplateName() : null));
-
-        //if savedFeedId is passed in merge the properties with the saved values
-        if (feedName != null) {
-            //TODO pass in the Category to this method
-            FeedMetadata feedMetadata = getMetadataService().getFeedByName("", feedName);
-            if (feedMetadata != null) {
-                List<NifiProperty> list = new ArrayList<>();
-                for (NifiProperty p : registeredTemplate.getProperties()) {
-                    list.add(new NifiProperty(p));
-                }
-                registeredTemplate.setProperties(list);
-                NifiPropertyUtil.matchAndSetTemplatePropertiesWithSavedProperties(registeredTemplate.getProperties(),
-                                                                                  feedMetadata.getProperties());
-            }
-        }
-        Set<PortDTO> ports = null;
-        // fetch ports for this template
-        try {
-            if (registeredTemplate.getNifiTemplate() != null) {
-                ports = nifiRestClient.getPortsForTemplate(registeredTemplate.getNifiTemplate());
-            } else {
-                ports = nifiRestClient.getPortsForTemplate(registeredTemplate.getNifiTemplateId());
-            }
-        } catch (NifiComponentNotFoundException notFoundException) {
-            feedManagerTemplateService.syncTemplateId(registeredTemplate);
-            ports = nifiRestClient.getPortsForTemplate(registeredTemplate.getNifiTemplateId());
-        }
-        if (ports == null) {
-            ports = new HashSet<>();
-        }
-        List<PortDTO> outputPorts = Lists.newArrayList(Iterables.filter(ports, portDTO -> {
-            return portDTO.getType().equalsIgnoreCase(NifiConstants.NIFI_PORT_TYPE.OUTPUT_PORT.name());
-        }));
-
-        List<PortDTO> inputPorts = Lists.newArrayList(Iterables.filter(ports, portDTO -> {
-            return portDTO.getType().equalsIgnoreCase(NifiConstants.NIFI_PORT_TYPE.INPUT_PORT.name());
-        }));
-        registeredTemplate.setReusableTemplate(inputPorts != null && !inputPorts.isEmpty());
-        List<ReusableTemplateConnectionInfo> reusableTemplateConnectionInfos = registeredTemplate.getReusableTemplateConnections();
-        List<ReusableTemplateConnectionInfo> updatedConnectionInfo = new ArrayList<>();
-
-        for (final PortDTO port : outputPorts) {
-
-            ReusableTemplateConnectionInfo reusableTemplateConnectionInfo = null;
-            if (reusableTemplateConnectionInfos != null && !reusableTemplateConnectionInfos.isEmpty()) {
-                reusableTemplateConnectionInfo = Iterables.tryFind(reusableTemplateConnectionInfos,
-                                                                   reusableTemplateConnectionInfo1 -> reusableTemplateConnectionInfo1
-                                                                       .getFeedOutputPortName()
-                                                                       .equalsIgnoreCase(port.getName())).orNull();
-            }
-            if (reusableTemplateConnectionInfo == null) {
-                reusableTemplateConnectionInfo = new ReusableTemplateConnectionInfo();
-                reusableTemplateConnectionInfo.setFeedOutputPortName(port.getName());
-            }
-            updatedConnectionInfo.add(reusableTemplateConnectionInfo);
-
-        }
-
-        registeredTemplate.setReusableTemplateConnections(updatedConnectionInfo);
-        registeredTemplate.initializeProcessors();
-        feedManagerTemplateService.ensureRegisteredTemplateInputProcessors(registeredTemplate);
-
+        RegisteredTemplateRequest
+            registeredTemplateRequest =
+            new RegisteredTemplateRequest.Builder().templateId(templateId).templateName(templateName).nifiTemplateId(templateId).includeAllProperties(allProperties).includePropertyDescriptors(true)
+                .isTemplateEdit(true).build();
+        RegisteredTemplate registeredTemplate = registeredTemplateService.getRegisteredTemplateForUpdate(registeredTemplateRequest);
         return Response.ok(registeredTemplate).build();
     }
 
@@ -567,30 +463,10 @@ public class TemplatesRestController {
     )
     public Response registerTemplate(RegisteredTemplate registeredTemplate) {
 
-        RegisteredTemplate saved = getMetadataService().registerTemplate(registeredTemplate);
-
-        if (saved.isReusableTemplate()) {
-            //attempt to auto create the Feed using this template
-            FeedMetadata metadata = metadataService.getFeedByName(TemplateCreationHelper.REUSABLE_TEMPLATES_CATEGORY_NAME, saved.getTemplateName());
-            if (metadata == null) {
-                metadata = new FeedMetadata();
-                FeedCategory category = metadataService.getCategoryBySystemName(TemplateCreationHelper.REUSABLE_TEMPLATES_PROCESS_GROUP_NAME);
-                if (category == null) {
-                    category = new FeedCategory();
-                    category.setName(TemplateCreationHelper.REUSABLE_TEMPLATES_CATEGORY_NAME);
-                    metadataService.saveCategory(category);
-                }
-                metadata.setCategory(category);
-                metadata.setTemplateId(saved.getId());
-                metadata.setFeedName(saved.getTemplateName());
-                metadata.setSystemFeedName(SystemNamingService.generateSystemName(saved.getTemplateName()));
-            }
-            metadata.setRegisteredTemplate(saved);
-            getMetadataService().createFeed(metadata);
-        }
+        RegisteredTemplate saved = feedManagerTemplateService.registerTemplate(registeredTemplate);
         return Response.ok(saved).build();
     }
-    
+
     @GET
     @Path("/registered/{templateId}/actions/available")
     @Produces(MediaType.APPLICATION_JSON)
@@ -606,7 +482,7 @@ public class TemplatesRestController {
                         .map(g -> Response.ok(g).build())
                         .orElseThrow(() -> new WebApplicationException("A template with the given ID does not exist: " + templateIdStr, Response.Status.NOT_FOUND));
     }
-    
+
     @GET
     @Path("/registered/{templateId}/actions/allowed")
     @Produces(MediaType.APPLICATION_JSON)
@@ -619,7 +495,7 @@ public class TemplatesRestController {
                                          @QueryParam("user") Set<String> userNames,
                                          @QueryParam("group") Set<String> groupNames) {
         log.debug("Get allowed actions for template: {}", templateIdStr);
-        
+
         Set<Principal> users = this.actionsTransform.toUserPrincipals(userNames);
         Set<Principal> groups = this.actionsTransform.toGroupPrincipals(groupNames);
 
@@ -627,7 +503,7 @@ public class TemplatesRestController {
                         .map(g -> Response.ok(g).build())
                         .orElseThrow(() -> new WebApplicationException("A template with the given ID does not exist: " + templateIdStr, Status.NOT_FOUND));
     }
-    
+
     @POST
     @Path("/registered/{templateId}/actions/allowed")
     @Consumes(MediaType.APPLICATION_JSON)
@@ -645,7 +521,7 @@ public class TemplatesRestController {
                         .map(g -> Response.ok(g).build())
                         .orElseThrow(() -> new WebApplicationException("A template with the given ID does not exist: " + templateIdStr, Response.Status.NOT_FOUND));
     }
-    
+
     @GET
     @Path("/registered/{templateId}/actions/change")
     @Produces(MediaType.APPLICATION_JSON)
@@ -666,8 +542,8 @@ public class TemplatesRestController {
         Set<Principal> users = this.actionsTransform.toUserPrincipals(userNames);
         Set<Principal> groups = this.actionsTransform.toGroupPrincipals(groupNames);
 
-        return this.securityService.createTemplatePermissionChange(templateIdStr, 
-                                                               ChangeType.valueOf(changeType.toUpperCase()), 
+        return this.securityService.createTemplatePermissionChange(templateIdStr,
+                                                               ChangeType.valueOf(changeType.toUpperCase()),
                                                                Stream.concat(users.stream(), groups.stream()).collect(Collectors.toSet()))
                         .map(p -> Response.ok(p).build())
                         .orElseThrow(() -> new WebApplicationException("A template with the given ID does not exist: " + templateIdStr, Status.NOT_FOUND));

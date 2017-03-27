@@ -28,6 +28,7 @@ import com.thinkbiganalytics.feedmgr.rest.model.FeedSummary;
 import com.thinkbiganalytics.feedmgr.rest.model.RegisteredTemplate;
 import com.thinkbiganalytics.feedmgr.rest.model.Tag;
 import com.thinkbiganalytics.feedmgr.rest.model.UserProperty;
+import com.thinkbiganalytics.feedmgr.service.EncryptionService;
 import com.thinkbiganalytics.feedmgr.service.UserPropertyTransform;
 import com.thinkbiganalytics.feedmgr.service.category.CategoryModelTransform;
 import com.thinkbiganalytics.feedmgr.service.template.TemplateModelTransform;
@@ -73,7 +74,7 @@ public class FeedModelTransform {
 
     @Inject
     private FeedProvider feedProvider;
-    
+
     @Inject
     private ActionsModelTransform actionsTransform;
 
@@ -89,6 +90,9 @@ public class FeedModelTransform {
     @Inject
     private HadoopSecurityGroupProvider hadoopSecurityGroupProvider;
 
+    @Inject
+    private EncryptionService encryptionService;
+
     /**
      *
      * @param feedMetadata
@@ -101,9 +105,39 @@ public class FeedModelTransform {
         feedMetadata.setRegisteredTemplate(null);
 
         //reset all those properties that contain config variables back to the string with the config options
-        feedMetadata.getProperties().stream().filter(property -> property.isContainsConfigurationVariables()).forEach(property -> property.resetToTemplateValue());
+        feedMetadata.getProperties().stream().filter(property -> property.isContainsConfigurationVariables()).forEach(property -> property.setValue(property.getTemplateValue()));
+        //reset all sensitive properties
+        //ensure its encrypted
+        encryptSensitivePropertyValues(feedMetadata);
 
 
+    }
+
+    private void clearSensitivePropertyValues(FeedMetadata feedMetadata) {
+        feedMetadata.getProperties().stream().filter(property -> property.isSensitive()).forEach(nifiProperty -> nifiProperty.setValue(""));
+    }
+
+    private void encryptSensitivePropertyValues(FeedMetadata feedMetadata) {
+        List<String> encrypted = new ArrayList<>();
+        feedMetadata.getSensitiveProperties().stream().forEach(nifiProperty -> {
+            nifiProperty.setValue(encryptionService.encrypt(nifiProperty.getValue()));
+            encrypted.add(nifiProperty.getValue());
+        });
+        int i = 0;
+    }
+
+    public void decryptSensitivePropertyValues(FeedMetadata feedMetadata) {
+        List<String> decrypted = new ArrayList<>();
+        feedMetadata.getProperties().stream().filter(property -> property.isSensitive()).forEach(nifiProperty -> {
+            try {
+                String decryptedValue = encryptionService.decrypt(nifiProperty.getValue());
+                nifiProperty.setValue(decryptedValue);
+                decrypted.add(decryptedValue);
+            } catch (Exception e) {
+
+            }
+        });
+        int i = 0;
     }
 
     /**
@@ -210,10 +244,17 @@ public class FeedModelTransform {
         return domain.stream().map(f -> domainToFeedMetadata(f, userFieldMap)).collect(Collectors.toList());
     }
 
-    public FeedMetadata deserializeFeedMetadata(Feed domain) {
+    public FeedMetadata deserializeFeedMetadata(Feed domain, boolean clearSensitiveProperties) {
         String json = domain.getJson();
         FeedMetadata feedMetadata = ObjectMapperSerializer.deserialize(json, FeedMetadata.class);
+        if (clearSensitiveProperties) {
+            clearSensitivePropertyValues(feedMetadata);
+        }
         return feedMetadata;
+    }
+
+    public FeedMetadata deserializeFeedMetadata(FeedManagerFeed domain) {
+        return deserializeFeedMetadata(domain, true);
     }
 
 
@@ -227,7 +268,7 @@ public class FeedModelTransform {
     @Nonnull
     private FeedMetadata domainToFeedMetadata(@Nonnull final Feed domain, @Nullable final Map<Category, Set<UserFieldDescriptor>> userFieldMap) {
 
-        FeedMetadata feed = deserializeFeedMetadata(domain);
+        FeedMetadata feed = deserializeFeedMetadata(domain, false);
         feed.setId(domain.getId().toString());
         feed.setFeedId(domain.getId().toString());
         feed.setTemplateId(domain.getTemplate().getId().toString());

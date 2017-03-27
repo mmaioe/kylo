@@ -84,7 +84,6 @@ public class MetadataJcrConfigurator {
         this.metadataAccess.commit(() -> {
             try {
                 Session session = JcrMetadataAccess.getActiveSession();
-
                 ensureLayout(session);
                 ensureTypes(session);
                 ensureAccessControl(session);
@@ -96,7 +95,6 @@ public class MetadataJcrConfigurator {
         this.metadataAccess.commit(() -> {
             try {
                 Session session = JcrMetadataAccess.getActiveSession();
-
                 removeVersionableFeedType(session);
             } catch (RepositoryException e) {
                 throw new MetadataRepositoryException("Could remove versioning from feeds", e);
@@ -104,7 +102,7 @@ public class MetadataJcrConfigurator {
         }, MetadataAccess.SERVICE);
 
         this.configured.set(true);
-        firePostConfigActions();
+       firePostConfigActions();
     }
 
     private void removeVersionableFeedType(Session session) throws RepositoryException {
