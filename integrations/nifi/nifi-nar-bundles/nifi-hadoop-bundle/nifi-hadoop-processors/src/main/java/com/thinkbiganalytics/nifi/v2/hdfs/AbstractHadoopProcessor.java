@@ -38,6 +38,7 @@ import org.apache.nifi.components.Validator;
 import org.apache.nifi.processor.ProcessContext;
 import org.apache.nifi.processor.ProcessorInitializationContext;
 import org.apache.nifi.processor.exception.ProcessException;
+import org.apache.nifi.processor.util.StandardValidators;
 
 import java.io.File;
 import java.io.IOException;
@@ -67,6 +68,15 @@ public abstract class AbstractHadoopProcessor extends AbstractNiFiProcessor {
         .required(false).addValidator(createMultipleFilesExistValidator()).build();
 
     public static final String DIRECTORY_PROP_NAME = "Directory";
+
+    public static final PropertyDescriptor ADDITIONAL_CLASSPATH_RESOURCES = new PropertyDescriptor.Builder()
+        .name("Additional Classpath Resources")
+        .description("A comma-separated list of paths to files and/or directories that will be added to the classpath. When specifying a " +
+                     "directory, all files with in the directory will be added to the classpath, but further sub-directories will not be included.")
+        .required(false)
+        .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+        .dynamicallyModifiesClasspath(true)
+        .build();
 
     private static final Object RESOURCES_LOCK = new Object();
     // variables shared by all threads of this processor
@@ -161,6 +171,7 @@ public abstract class AbstractHadoopProcessor extends AbstractNiFiProcessor {
         props.add(kerberosPrincipal);
         props.add(kerberosKeytab);
         props.add(KerberosProperties.KERBEROS_RELOGIN_PERIOD);
+        props.add(ADDITIONAL_CLASSPATH_RESOURCES);
         properties = Collections.unmodifiableList(props);
     }
 
