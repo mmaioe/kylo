@@ -45,6 +45,8 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.URI;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -229,7 +231,18 @@ public abstract class AbstractHadoopProcessor extends AbstractNiFiProcessor {
         // later to do I/O. We need this class loader to be the NarClassLoader instead of the magical
         // NarThreadContextClassLoader.
         ClassLoader savedClassLoader = Thread.currentThread().getContextClassLoader();
-        Thread.currentThread().setContextClassLoader(this.getClass().getClassLoader());
+
+        //Thread.currentThread().setContextClassLoader(this.getClass().getClassLoader());
+
+        URL[] urls = new URL[4];
+        urls[0] = new URL("/opt/nifi/azure/wasb/azure-storage-2.0.0.jar");
+        urls[0] = new URL("/opt/nifi/azure/wasb/hadoop-azure-2.7.3.jar");
+        urls[0] = new URL("/opt/nifi/azure/wasb/hadoop-common-2.7.3.jar");
+        urls[0] = new URL("/opt/nifi/azure/wasb/hadoop-core-1.1.0.jar");
+        getLog().info("ito-test :: "+this.getPropertyDescriptor(ADDITIONAL_CLASSPATH_RESOURCES.getName()).getAllowableValues().toString());
+        URLClassLoader loader = URLClassLoader.newInstance(urls, this.getClass().getClassLoader());
+
+        Thread.currentThread().setContextClassLoader(loader);
 
         try {
             Configuration config = getConfigurationFromResources(configResources);
