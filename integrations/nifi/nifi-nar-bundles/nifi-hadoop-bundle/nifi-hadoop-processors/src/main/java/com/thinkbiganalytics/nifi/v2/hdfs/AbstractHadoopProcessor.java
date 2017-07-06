@@ -234,12 +234,12 @@ public abstract class AbstractHadoopProcessor extends AbstractNiFiProcessor {
 
         //Thread.currentThread().setContextClassLoader(this.getClass().getClassLoader());
 
-        URL[] urls = new URL[4];
-        urls[0] = new URL("/opt/nifi/azure/wasb/azure-storage-2.0.0.jar");
-        urls[0] = new URL("/opt/nifi/azure/wasb/hadoop-azure-2.7.3.jar");
-        urls[0] = new URL("/opt/nifi/azure/wasb/hadoop-common-2.7.3.jar");
-        urls[0] = new URL("/opt/nifi/azure/wasb/hadoop-core-1.1.0.jar");
-        getLog().info("ito-test :: "+this.getPropertyDescriptor(ADDITIONAL_CLASSPATH_RESOURCES.getName()).getAllowableValues().toString());
+        URL[] urls = new URL[3];
+        urls[0] = new URL("file:///opt/nifi/azure/wasb/azure-storage-2.0.0.jar");
+        urls[1] = new URL("file:///opt/nifi/azure/wasb/hadoop-azure-2.7.3.jar");
+        urls[2] = new URL("file:///opt/nifi/azure/wasb/hadoop-common-2.7.3.jar");
+        getLog().info("ito-test :: "+context.getProperty(ADDITIONAL_CLASSPATH_RESOURCES).getValue());
+
         URLClassLoader loader = URLClassLoader.newInstance(urls, this.getClass().getClassLoader());
 
         Thread.currentThread().setContextClassLoader(loader);
